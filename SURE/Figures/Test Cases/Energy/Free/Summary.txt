@@ -1,8 +1,0 @@
-Simulation run at 17-Aug-2025 11.23.18.
-Objective: Energy
-Objective Value: 121.6286
-Constraints:
-	State Upper:	187           10000           10000              20     0.785398163      3.14159265               1               0
-	State Lower:	167          -10000          -10000      13.9423565    -0.785398163     -3.14159265               0           -0.25
-	Input Upper:	0.139626     0.785398     -30.7692
-	Input Lower:	-0.1396263    -0.7853982          -130

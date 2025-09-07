@@ -1,8 +1,0 @@
-Simulation run at 20-Aug-2025 00.02.41.
-Objective: Time
-Objective Value: 147.4279
-Constraints:
-	State Upper:	187           10000           10000              20     0.785398163      3.14159265               1               0
-	State Lower:	167          -10000          -10000      12.9081139    -0.785398163     -3.14159265               0           -0.25
-	Input Upper:	0.174533     0.785398     -30.7692
-	Input Lower:	-0.1745329    -0.7853982          -130
