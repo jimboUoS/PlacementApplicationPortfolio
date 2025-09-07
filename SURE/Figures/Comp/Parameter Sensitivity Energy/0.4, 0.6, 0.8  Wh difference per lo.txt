@@ -1,0 +1,7 @@
+0.4, 0.6, 0.8  Wh difference per loop (0.6, 0.7, 0.8 for CD0 respectively)
+
+Suggests small difference in energy consumption due to height strategy, and so only use height strategy if there is a high degree of certainty in the aerodynamic parameters
+
+1s 0.7s 0.5s increase in lap time when removing height strategy for respective CD0 (0.6 0.7 0.8).
+
+k=0.05 for all sims

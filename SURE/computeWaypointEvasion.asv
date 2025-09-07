@@ -1,0 +1,51 @@
+function [a,b,c,xf_min,xf_max,yf_min,yf_max] = computeWaypointEvasion (phaseNumber,waypoints,muBounds)
+    %determine how far outside the waypoint the drone can go
+    %fit ax+by=1000 so that xf, yf lie on that line
+    %this prevents cutting of corners
+    
+    i=1+mod(phaseNumber,size(waypoints,1));
+    X=[waypoints.DistNorth(i) waypoints.DistEast(i)];
+    
+    if i == 1
+        M = 0.5.*([waypoints.DistNorth(size(waypoints,1)) waypoints.DistEast(size(waypoints,1))]+[waypoints.DistNorth(2) waypoints.DistEast(2)]);
+    elseif i == size(waypoints,1)
+         M = 0.5.*([waypoints.DistNorth(i-1) waypoints.DistEast(i-1)]+[waypoints.DistNorth(1) waypoints.DistEast(1)]);
+    else    
+        M = 0.5.*([waypoints.DistNorth(i-1) waypoints.DistEast(i-1)]+[waypoints.DistNorth(i+1) waypoints.DistEast(i+1)]);
+    end
+
+    waypointBound1=X-muBounds(1).*(M-X)./norm((M-X));
+    waypointBound2=X-muBounds(2).*(M-X)./norm((M-X));
+
+    xf_min=min([waypointBound1(1),waypointBound2(1)]);
+    xf_max=max([waypointBound1(1),waypointBound2(1)]);
+    yf_min=min([waypointBound1(2),waypointBound2(2)]);
+    yf_max=max([waypointBound1(2),waypointBound2(2)]);
+    
+    if det([waypointBound1;waypointBound2])==0
+        if muBounds(1)==muBounds(2)
+            a = 0; 
+            b = 0; 
+            c = 0; 
+        else
+            if xf_min == xf_max
+                a = 1; 
+                b = 0; 
+                c = -xf_min; 
+            elseif yf_min == yf_max
+                a = 0; 
+                b = 1; 
+                c = -yf_min; 
+            else
+                a = (waypointBound1(2)-waypointBound2(2))/(); 
+                b = -1; 
+                c = 0;
+            end
+        end
+    else
+        [Sol,]=linsolve([waypointBound1;waypointBound2],1000*ones(2,1));
+        a=Sol(1);
+        b=Sol(2);
+        c=1000;
+    end
+end

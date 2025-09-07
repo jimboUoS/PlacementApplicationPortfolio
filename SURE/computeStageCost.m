@@ -1,0 +1,75 @@
+auxdata = vdat.auxdata;
+
+H = x(:,1);
+npos = x(:,2);
+epos = x(:,3);
+V_tas = x(:,4);
+gamma = x(:,5);
+chi = x(:,6);
+SOC = x(:,7);
+Volt_RC = x(:,8);
+
+alpha = u(:,1);
+phi = u(:,2);
+current = u(:,3);
+
+%Battery dynamics
+SOC_dot=current./(auxdata.Q);
+Volt_RC_dot = -Volt_RC/(auxdata.R1*auxdata.C1) + current/(auxdata.C1);
+Volt0 = 3.64 +0.55.*SOC - 0.72.*SOC.^2 + 0.75.*SOC.^3;
+Volt_Out = auxdata.Series.*(Volt0 + Volt_RC + auxdata.R0.*current);
+
+Temp=auxdata.Ts+H.*auxdata.dTdH;
+% pressure=auxdata.ps*(Temp./auxdata.Ts).^(-auxdata.g/auxdata.dTdH/auxdata.R);
+rho=auxdata.rhos.*(Temp./auxdata.Ts).^(-(auxdata.g./auxdata.dTdH./auxdata.R+1));
+rho_ratio=rho./auxdata.rhos;
+% a_sos=sqrt(auxdata.kappa*auxdata.R.*Temp);
+
+%Electrical power input defined with negative current as sign convention
+%Refer to Courtier et al 2022 "Discretisation-free battery fast-charging optimisation using the 
+% measure-moment approach"
+
+P=Volt_Out.*(-current);
+Ph=(1.132.*rho_ratio-0.132).*P; %power at altitude
+J=60*V_tas./auxdata.nProp_Data_Fit(P./auxdata.NumberProps)./auxdata.Dprop;
+ita=auxdata.ita_Data_Fit(J);
+Thrust=ita.*Ph./V_tas;
+
+% Calculate aerodynamic forces
+cl=auxdata.CL_Data_Fit(alpha);
+L=0.5.*cl.*rho.*V_tas.^2.*auxdata.S;
+cd=auxdata.cd0+auxdata.k_cd*cl.^2;
+Drag=0.5.*cd.*rho.*V_tas.^2.*auxdata.S;
+
+%% equations of motions
+W=auxdata.OEW+auxdata.WPayload;
+
+TAS_dot=(Thrust-Drag-W.*sin(gamma)).*auxdata.g./W;
+gamma_dot=(L.*cos(phi)+Thrust*sin(auxdata.alphat).*cos(phi)-W.*cos(gamma))*auxdata.g./W./V_tas;
+H_dot=V_tas.*sin(gamma);
+%wind components, note minus sign so that wind heading is where wind is
+%coming from, not where it is going to
+WindNorth = -auxdata.WindSpeed.*cos(auxdata.WindHeading).*ones(size(V_tas));
+WindEast = -auxdata.WindSpeed.*sin(auxdata.WindHeading).*ones(size(V_tas));
+%ground speed
+x_dot=V_tas.*cos(gamma).*cos(chi) + WindNorth;
+y_dot=V_tas.*cos(gamma).*sin(chi) + WindEast;
+chi_dot=L.*sin(phi)./cos(gamma)*auxdata.g./W./V_tas;
+% Mach=V_tas./a_sos;
+
+%% 
+
+dx = [H_dot, x_dot, y_dot, TAS_dot, gamma_dot, chi_dot, SOC_dot,Volt_RC_dot];
+
+% g_neq = [];
+% load("missionData.mat","navigation");
+% 
+% [aGeofence, bGeofence, cGeofence] = geofenceToIneqConstraints(navigation.geofence.cartesian);
+% 
+% g_neq = aGeofence.*npos + bGeofence.*epos + cGeofence;
+% % 
+%stageCost = 0.01*H_dot.*H_dot+60*gamma_dot.*gamma_dot+40*chi_dot.*chi_dot+0.1*(alpha.*alpha+phi.*phi) -4*Volt_RC;
+%stageCost = 0.01*H_dot.*H_dot+60*gamma_dot.*gamma_dot+40*chi_dot.*chi_dot+0.1*(alpha.*alpha+phi.*phi);
+stageCost=zeros(size(gamma));
+%stageCost = 0.01*chi_dot.*chi_dot;
+

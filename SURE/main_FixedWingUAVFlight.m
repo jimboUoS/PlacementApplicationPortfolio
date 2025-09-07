@@ -1,0 +1,310 @@
+% Main script to solve the Optimal Control Problem
+%
+% F50MinTimeFlight - Minimum Time Flight Profile for Commercial Aircraft
+%
+% The aerodynamic and propulsion data are obtained from
+% "Performance model Fokker 50", Delft University of Technology, 2010
+%
+% Copyright (C) 2019 Yuanbo Nie, Omar Faqir, and Eric Kerrigan. All Rights Reserved.
+% The contribution of Paola Falugi, Eric Kerrigan and Eugene van Wyk for the work on ICLOCS Version 1 (2010) is kindly acknowledged.
+% This code is published under the BSD License.
+% Department of Aeronautics and Department of Electrical and Electronic Engineering,
+% Imperial College London London  England, UK 
+% ICLOCS (Imperial College London Optimal Control) Version 2.0 
+% 1 May 2019
+% iclocs@imperial.ac.uk
+
+
+%--------------------------------------------------------
+clear;close all;format compact;
+    
+objectiveArr = ["Energy","Time"];
+%lineSpecArr = ["g-", "b-", "r-"];
+gemArr = orderedcolors("gem");
+gemArr = gemArr([2 3 5],:);
+legendArr = ["Minimum Energy", "Minimum Time", "Competition Flight Log"];
+
+for j=1:2
+    
+    load("missionData.mat")
+    
+    navigation.origin = navigation.waypoints.latlong(1,:);
+    navigation.waypoints.cartesian = latLongToCartesian(navigation.origin, navigation.waypoints.latlong);
+    navigation.geofence.cartesian = latLongToCartesian(navigation.origin, navigation.geofence.latlong);
+    navigation.distances = sqrt(sum(diff([navigation.waypoints.cartesian.DistNorth(:) navigation.waypoints.cartesian.DistEast(:)]).^2, 2));
+    navigation.distances=[navigation.distances;sqrt((navigation.waypoints.cartesian.DistNorth(end)-navigation.waypoints.cartesian.DistNorth(1)).^2 + (navigation.waypoints.cartesian.DistEast(end)-navigation.waypoints.cartesian.DistEast(1)).^2)];
+    phaseNodes = round(0.1*navigation.distances);
+    
+    
+    nPhases=11;
+    %validation on nPhases, can't have more phases than n waypoints - 1
+    if nPhases > length(navigation.waypoints.cartesian.DistNorth)
+        nPhases=length(navigation.waypoints.cartesian.DistNorth);
+    end
+    [navigation.chiGuess, navigation.chi_f] = transformTrackAngleGuess(navigation.waypoints.cartesian);
+    
+    bounds = defineBounds;
+    objective = objectiveArr(j);
+    save ("missionData.mat","nPhases","navigation","objective","bounds","phaseNodes");
+    [problem,guess,options.phaseoptions]=FixedWingUAVFlight;          % Fetch the problem definition
+    options.mp= settings_FixedWingUAVFlight;                  % Get options and solver settings 
+    [solution,MRHistory]=solveMyProblem(problem,guess,options);
+    
+    
+    missionData = load("missionData.mat");
+    tt=cell(1,missionData.nPhases);
+    x1=cell(1,missionData.nPhases);
+    x2=cell(1,missionData.nPhases);
+    x3=cell(1,missionData.nPhases);
+    x4=cell(1,missionData.nPhases);
+    x5=cell(1,missionData.nPhases);
+    x6=cell(1,missionData.nPhases);
+    x7=cell(1,missionData.nPhases);
+    x8=cell(1,missionData.nPhases);
+    u1=cell(1,missionData.nPhases);
+    u2=cell(1,missionData.nPhases);
+    u3=cell(1,missionData.nPhases);
+    
+    for i=1:missionData.nPhases
+        auxdata=problem.phases{i}.data.auxdata;
+        tt{i}=linspace(solution.phaseSol{i}.T(1,1),solution.phaseSol{i}.tf,1000);
+        x1{i}=speval(solution.phaseSol{i},'X',1,tt{i});
+        x2{i}=speval(solution.phaseSol{i},'X',2,tt{i});
+        x3{i}=speval(solution.phaseSol{i},'X',3,tt{i});
+        x4{i}=speval(solution.phaseSol{i},'X',4,tt{i});
+        x5{i}=speval(solution.phaseSol{i},'X',5,tt{i});
+        x6{i}=speval(solution.phaseSol{i},'X',6,tt{i});
+        x7{i}=speval(solution.phaseSol{i},'X',7,tt{i});
+        x8{i}=speval(solution.phaseSol{i},'X',8,tt{i});
+        u1{i}=speval(solution.phaseSol{i},'U',1,tt{i});
+        u2{i}=speval(solution.phaseSol{i},'U',2,tt{i});
+        u3{i}=speval(solution.phaseSol{i},'U',3,tt{i});
+    
+    
+        figure(10)
+        hold on
+        if i==1
+            plot(x3{i},x2{i},'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j),'LineWidth',2)
+        else
+            plot(x3{i},x2{i},'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off','LineWidth',2)
+        end
+        xlabel('East Position [m]')
+        ylabel('North Position [m]')
+        % grid on
+    
+        figure(1)
+        view(2)
+        hold on
+        subplot(3,1,1)
+        hold on
+        if i==1
+            plot(tt{i},x1{i},'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},x1{i},'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('Altitude [m]')
+        grid on
+        
+        subplot(3,1,2)
+        hold on
+        if i==1
+            plot(tt{i},x4{i},'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},x4{i},'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('True Airspeed [m/s]')
+        grid on
+    
+        WindNorth = -auxdata.WindSpeed.*cos(auxdata.WindHeading).*ones(size(x4{i}));
+        WindEast = -auxdata.WindSpeed.*sin(auxdata.WindHeading).*ones(size(x4{i}));
+        %ground speed
+        x_dot= x4{i}.*cos(x5{i}).*cos(x6{i}) + WindNorth;
+        y_dot= x4{i}.*cos(x5{i}).*sin(x6{i}) + WindEast;
+        GroundSpeed = sqrt(x_dot.^2 + y_dot.^2);
+    
+        subplot(3,1,3)
+        hold on
+        if i==1
+            plot(tt{i},GroundSpeed,'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},GroundSpeed,'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('Ground Speed [m/s]')
+        grid on
+        
+        figure(2)
+        hold on
+        subplot(2,1,1)
+        hold on
+        if i==1
+            plot(tt{i},x5{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},x5{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        hold on
+        xlabel('Time [s]')
+        ylabel('Flight Path Angle [deg]')
+        grid on
+        
+        
+        subplot(2,1,2)
+        hold on
+        if i==1
+            plot(tt{i},x6{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},x6{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        hold on
+        xlabel('Time [s]')
+        ylabel('Tracking Angle [deg]')
+        grid on
+        
+        figure(3)
+        
+        subplot(3,1,1)
+        hold on
+        if i==1
+            plot(tt{i},u1{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},u1{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('Angle of attack (Control) [deg]')
+        grid on
+    
+        hold on
+        subplot(3,1,2)
+        hold on
+        if i==1
+            plot(tt{i},u2{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},u2{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('Roll angle (Control) [deg]')
+        grid on
+        
+        subplot(3,1,3)
+        hold on
+        if i==1
+            plot(tt{i},u3{i},'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},u3{i},'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('Motor Current (Control) [A]')
+        grid on
+        
+        
+        figure(4)
+        hold on
+        if i==1
+            plot(tt{i},x5{i}*180/pi+u1{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i},x5{i}*180/pi+u1{i}*180/pi,'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('Pitch Angle [deg]')
+        grid on
+    
+        figure(5)
+        subplot(2,1,1)
+        hold on
+        if i==1
+            plot(tt{i}, x7{i},'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j))
+        else
+            plot(tt{i}, x7{i},'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off')
+        end
+        xlabel('Time [s]')
+        ylabel('State of Charge')
+        grid on
+    
+        subplot(2,1,2)
+        hold on
+        if i==1
+            plot(tt{i}, auxdata.Series.*(feval(auxdata.OCV_Curve,x7{i})),'-','Color',gemArr(j,:),'LineWidth',1,'DisplayName',legendArr(j));
+        else
+            plot(tt{i}, auxdata.Series.*(feval(auxdata.OCV_Curve,x7{i})),'-','Color',gemArr(j,:),'LineWidth',1,'HandleVisibility','off');
+        end
+        xlabel('Time [s]')
+        ylabel('Battery Open Circuit Voltage [V]')
+        grid on
+    end
+end
+
+figure(10)
+hold on
+
+irlLogData = readtable("CompFlightData3.csv");
+irlLatLong=table();
+irlLatLong.Lat=irlLogData.GPS_0__Lat*10^-7;
+irlLatLong.Long=irlLogData.GPS_0__Lng*10^-7;
+figure(10)
+hold on
+irlCartesian = latLongToCartesian(missionData.navigation.origin,irlLatLong);
+plot(irlCartesian.DistEast,irlCartesian.DistNorth,'Color',gemArr(3,:),'LineWidth',2,"DisplayName","Competition Flight Log")
+
+%plot original waypoints
+for i=2:size(missionData.navigation.waypoints.cartesian,1)
+    plot(missionData.navigation.waypoints.cartesian.DistEast(i),missionData.navigation.waypoints.cartesian.DistNorth(i),"kx",'HandleVisibility','off')
+end
+plot(missionData.navigation.waypoints.cartesian.DistEast(1),missionData.navigation.waypoints.cartesian.DistNorth(1),"kx","DisplayName","Waypoints")
+%plot geofence
+for i=2:size(missionData.navigation.geofence.cartesian,1)
+    plot([missionData.navigation.geofence.cartesian.DistEast(i-1,1) missionData.navigation.geofence.cartesian.DistEast(i,1)],[missionData.navigation.geofence.cartesian.DistNorth(i-1,1) missionData.navigation.geofence.cartesian.DistNorth(i,1)],"k--",'HandleVisibility','off')
+end
+plot([missionData.navigation.geofence.cartesian.DistEast(size(missionData.navigation.geofence.cartesian,1),1) missionData.navigation.geofence.cartesian.DistEast(1,1)],[missionData.navigation.geofence.cartesian.DistNorth(size(missionData.navigation.geofence.cartesian,1),1) missionData.navigation.geofence.cartesian.DistNorth(1,1)],"k--","DisplayName","Geofence")
+
+% Add code here for plotting irl AMSL, TAS, GS
+
+% BARO_0__AltAMSL
+% ARSP_0__Airspeed
+% GPS_0__Spd
+
+figure(1)
+hold on
+
+subplot(3,1,1)
+irlLogData.relativeTime = (irlLogData.timestamp_ms_- irlLogData.timestamp_ms_(1))*10^-3;
+plot(irlLogData.relativeTime,irlLogData.BARO_0__AltAMSL,'Color',gemArr(3,:),'LineWidth',1,"DisplayName","Competition Flight Log")
+
+subplot(3,1,2)
+plot(irlLogData.relativeTime,irlLogData.ARSP_0__Airspeed,'Color',gemArr(3,:),'LineWidth',1,"DisplayName","Competition Flight Log")
+%plot(irlLogData.relativeTime,irlLogData.CTUN_As,'Color',gemArr(3,:),'LineWidth',1,"DisplayName","Competition Flight Log")
+
+subplot(3,1,3)
+plot(irlLogData.relativeTime,irlLogData.GPS_0__Spd,'Color',gemArr(3,:),'LineWidth',1,"DisplayName","Competition Flight Log")
+
+for i=[1:6 10]
+    figure(i)
+    if i==2
+        subplot(3,1,1)
+        legend
+        subplot(3,1,2)
+        legend
+        subplot(3,1,3)
+    end
+    legend
+end
+
+%save all figures for each iteration of changes in aircraft parameters
+cd(strcat("Figures\Compare\"));
+timeNow=replace(string(datetime('now','TimeZone','local','Format','d-MMM-y HH:mm:ss')), ":", ".");
+auxdata=problem.phases{1}.data.auxdata;
+
+mkdir(strcat("Height Fixed ",missionData.objective," CD0=",string(auxdata.cd0)," k=",string(auxdata.k_cd)," ", timeNow));
+cd(strcat("Height Fixed ",missionData.objective," CD0=",string(auxdata.cd0)," k=",string(auxdata.k_cd)," ", timeNow));
+
+summaryStr = sprintf(strcat("Simulation run at ",timeNow,".\n","Objective: ",missionData.objective,"\nObjective Value: ",string(solution.mp.cost.J),"\nConstraints:\n\tState Upper:\t",num2str(missionData.bounds.xu),"\n\tState Lower:\t",num2str(missionData.bounds.xl),"\n\tInput Upper:\t",num2str(missionData.bounds.uu),"\n\tInput Lower:\t",num2str(missionData.bounds.ul)));
+
+writelines(summaryStr,"Summary.txt")
+
+saveas(figure(10), "Figure 10.fig");
+saveas(figure(1), "Figure 1.fig");
+saveas(figure(2), "Figure 2.fig");
+saveas(figure(3), "Figure 3.fig");
+saveas(figure(4), "Figure 4.fig");
+saveas(figure(5), "Figure 5.fig");

@@ -1,0 +1,59 @@
+Procedure for adjusting aircraft parameters:
+
+Iteration 2
+	Halve max weight and fuel weight
+	Run sim (2.1) (249 iterations) (Weight continuity enforced)
+	
+	Halve wing area
+	Run sim (2.2) (156 iterations) (Weight continuity enforced)
+
+	Halve power output 
+	Run sim (2.3) (122 iterations) (Weight continuity enforced)
+
+	Halve initial velocity 
+	Run sim (2.4) (198 iterations) (Weight continuity enforced)
+
+	Halve max velocity (Mach number) 
+	Run sim (2.5) (200 iterations) (Weight continuity enforced)
+
+Iteration 3
+	Halve max weight, initial weight and fuel weight (40 kg, 40 kg, 5 kg respectively)
+	Run sim (3.1) (122 iterations) (Weight continuity enforced)
+
+	Halve wing area (1.4 m^2)
+	Run sim (3.2) (134 iterations) (Weight continuity enforced)
+
+	Halve power output (13000) 
+	Run sim (3.3) (297 iterations) (Weight continuity enforced)
+
+Iteration 4
+	Halve max weight, initial weight and fuel weight (20 kg, 20 kg, 2.5 kg respectively)
+	Run sim (4.1) 
+
+	Reduce wing area to that of SHARD (0.752)
+	Run sim (4.2) (121 iterations) (Weight continuity enforced)
+
+	Halve Pmax (6500) 
+	Run sim (4.3) (265 iterations) (Weight continuity enforced)
+
+Iteration 5
+	Halve max weight, initial weight and fuel weight (10 kg, 10 kg, 1.25 kg respectively)
+	Run sim (5.1) (155 iterations) (Weight continuity enforced)
+
+	Halve Pmax (3250)
+	Run sim (5.3) (254 iterations) (Weight continuity enforced)
+
+	Reduce initial velocity to 12 m/s
+	Run sim (5.4) (160 iterations) (Weight continuity enforced)
+
+	Halve max velocity (Mach number) (0.150)
+	Run sim (5.5) (297 iterations) (Weight continuity enforced)
+
+	Halve max velocity (Mach number) (0.075)
+	Run sim (5.6) (220 iterations) (Weight continuity enforced)
+
+	Reduce max mach number to 0.0588 (20 m/s)
+	Run sim (5.7) (139 iterations) (Weight continuity enforced)
+
+
+
