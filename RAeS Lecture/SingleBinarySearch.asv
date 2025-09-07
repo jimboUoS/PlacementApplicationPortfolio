@@ -1,0 +1,73 @@
+%physical constants
+g=9.81;
+%aircraft params
+
+%efficiencies
+PSFC = [0.0000001113484452 0.00000007789322188 0.0000000790759823];
+
+liftDragRatio=[13.5 14 16.8];
+
+etaProp=0.8;
+etaTurbine = 0.35;
+etaGenerator = 0.98;
+etaMotor = 0.9;
+etaGearbox = 0.95;
+
+etaFuelChain = etaTurbine*etaGearbox*etaGenerator*etaMotor*etaProp;
+etaBatChain = etaGearbox*etaMotor*etaProp;
+
+%mission requirements
+massPayload=[1200, 3298, 7400];
+
+%masses
+
+massOperatingEmpty=[2145 8620 13600];
+
+aircraftMTOW=[3629 13155 23000];
+
+aircraftNames = ["Cessna 208 Caravan" "SAAB 340B" "ATR72-600"];
+
+%specific energies/consumption
+eBat = 0.8*3600*300;
+eFuel = 43.1*10^6;
+
+rangeLowerBound = 500 * 10^3;
+
+
+%the energy mass must be at least equal to the conventional fuel deltaM
+%but must not exceed MTOW-payload-oem
+
+%dependent variables
+
+i=2;
+MTOWMultiplier = 1.25;
+
+%bounds on fuel mass
+deltaMConventional=(aircraftMTOW(i))*(1-exp(-g*PSFC(i)*rangeLowerBound/(liftDragRatio(i)*etaProp)));
+
+maxMTOW=MTOWMultiplier*aircraftMTOW(i);
+massEnergy = maxMTOW - massPayload(i) - massOperatingEmpty(i);
+
+phiUpper = 1;
+phiLower = 0;
+
+for k=1:16
+    phi = (phiUpper+phiLower)/2;
+    massFuel = (((1-phi).*eBat.*massEnergy)./(phi.*eFuel+(1-phi).*eBat));
+    range = (1/g)*liftDragRatio(i)*( etaFuelChain*eFuel*log((maxMTOW)/(maxMTOW-massFuel)) + etaBatChain*(eBat*(massEnergy-massFuel))/(maxMTOW-massFuel));
+    if range>=rangeLowerBound
+        phiLower=phi;
+    elseif range<rangeLowerBound
+        phiUpper = phi;
+    end
+    normalisedFuelMass = massFuel/deltaMConventional;
+end
+fprintf("Percent Fuel Saving Maximised at phi=%f\n",phi);
+percentFuelSaving=(1-normalisedFuelMass)*100;
+fprintf("\tNFC = %f\n",normalisedFuelMass);
+fprintf("\tRange = %.0f km\n",range*10^-3);
+fprintf("\tMTOW Multiplier = %.2f km\n",MTOWMultiplier);
+fprintf("\teBat = %.0f Wh/kg\n",eBat/(0.8*3600));
+
+
+    

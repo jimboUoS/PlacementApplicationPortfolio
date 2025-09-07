@@ -1,0 +1,5 @@
+Next steps for RAeS Paper:
+
+The code can't verify if the mass of the fuel is enough to achieve a certain range
+
+Write code to check the Breguet range for a given delta m to see if they match up
